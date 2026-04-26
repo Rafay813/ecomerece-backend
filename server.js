@@ -15,69 +15,67 @@ import orderRoutes from "./routes/orders.js";
 import uploadRoutes from "./routes/upload.js";
 import { notFound, errorHandler } from "./middleware/errorHandler.js";
 
-// ✅ Needed for __dirname in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Connect to MongoDB
 connectDB();
 
 const app = express();
 
-// ✅ CORS setup for both local dev and deployed frontend
+// ─── Allowed Origins ──────────────────────────────────────────────────────────
 const allowedOrigins = [
   "http://localhost:5173",
-  process.env.CLIENT_URL // <-- make sure to set this in Render env vars
-];
+  "http://localhost:3000",
+  "https://thunderous-cucurucho-83aaeaff.netlify.app",
+  process.env.CLIENT_URL,
+].filter(Boolean);
 
-app.use(cors({
+// ─── CORS Config ──────────────────────────────────────────────────────────────
+const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (Postman, mobile apps)
     if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    } else {
-      return callback(new Error("CORS not allowed from this origin"));
-    }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`CORS blocked: ${origin}`));
   },
   credentials: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
-}));
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
 
-// ✅ Handle preflight requests for all routes
-app.options("*", cors());
+app.use(cors(corsOptions));
 
-// ✅ Body parsers
+// ✅ Preflight — must use same corsOptions not plain cors()
+app.options("*", cors(corsOptions));
+
+// ─── Body Parsers ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10kb" }));
 app.use(express.urlencoded({ extended: true }));
 
-// ✅ Logger for development
+// ─── Logger ───────────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === "development") {
   app.use(morgan("dev"));
 }
 
-// ✅ Serve uploaded files
+// ─── Static Files ─────────────────────────────────────────────────────────────
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// ✅ Health check endpoint
+// ─── Health Check ─────────────────────────────────────────────────────────────
 app.get("/api/health", (req, res) => {
   res.json({ success: true, message: "API running ✅", timestamp: new Date().toISOString() });
 });
 
-// ✅ API routes
-app.use("/api/auth", authRoutes);
+// ─── Routes ───────────────────────────────────────────────────────────────────
+app.use("/api/auth",     authRoutes);
 app.use("/api/products", productRoutes);
-app.use("/api/cart", cartRoutes);
-app.use("/api/orders", orderRoutes);
-app.use("/api/upload", uploadRoutes);
+app.use("/api/cart",     cartRoutes);
+app.use("/api/orders",   orderRoutes);
+app.use("/api/upload",   uploadRoutes);
 
-// ✅ Error handling middleware
+// ─── Error Handling ───────────────────────────────────────────────────────────
 app.use(notFound);
 app.use(errorHandler);
 
-// ✅ Start server
+// ─── Start Server ─────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`\n🚀 Server running on port ${PORT}`);
